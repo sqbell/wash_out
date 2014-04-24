@@ -19,6 +19,14 @@ describe WashOut do
     savon.call(method, :message => message).to_hash
   end
 
+  # Don't raise savon exceptions
+  def safe_savon(method, message={}, &block)
+    message = {:value => message} unless message.is_a?(Hash)
+
+    savon = Savon::Client.new(:raise_errors => false, :log => false, :wsdl => 'http://app/api/wsdl', &block)
+    savon.call(method, :message => message).to_hash
+  end
+
   def savon!(method, message={}, &block)
     message = {:value => message} unless message.is_a?(Hash)
 
@@ -479,7 +487,7 @@ describe WashOut do
 
         lambda {
           savon(:duty, :bad => 42, :good => nil)
-        }.should raise_exception(Savon::SOAPFault)
+        }.should raise_exception(WashOut::Dispatcher::SOAPError)
       end
 
       it "raise for date in incorrect format" do
@@ -491,7 +499,7 @@ describe WashOut do
         end
         lambda {
           savon(:date, :value  => 'incorrect format')
-        }.should raise_exception(Savon::SOAPFault)
+        }.should raise_exception(WashOut::Dispatcher::SOAPError)
       end
 
       it "raise to report SOAP errors" do
@@ -529,6 +537,22 @@ describe WashOut do
         end
 
         lambda { savon(:error) }.should raise_exception(Savon::SOAPFault)
+      end
+
+      it "raises error_details" do
+        mock_controller do
+          soap_action "error",
+                      :args => { :need_error => :boolean },
+                      :return => nil,
+                      error: { :error_code => :integer}
+          def error
+            detail = { errorCode: 1 }
+            render_soap_error "a message", 1, { :error_code => 1 }
+          end
+        end
+
+        expect(safe_savon(:error)[:fault][:detail]).to eq(
+          {:error_fault => { :error_code => "1" }})
       end
 
       it "raise when response structure mismatches" do
@@ -704,7 +728,7 @@ describe WashOut do
     it "handles auth callback" do
       mock_controller(
         wsse_auth_callback: lambda {|user, password|
-          return user == "gorilla" && password == "secret" 
+          return user == "gorilla" && password == "secret"
         }
       ) do
         soap_action "checkAuth", :args => :integer, :return => :boolean, :to => 'check_auth'
