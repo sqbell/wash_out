@@ -487,7 +487,7 @@ describe WashOut do
 
         lambda {
           savon(:duty, :bad => 42, :good => nil)
-        }.should raise_exception(Savon::SOAPFault)
+        }.should raise_exception(WashOut::Dispatcher::SOAPError)
       end
 
       it "raise for date in incorrect format" do
@@ -499,7 +499,7 @@ describe WashOut do
         end
         lambda {
           savon(:date, :value  => 'incorrect format')
-        }.should raise_exception(Savon::SOAPFault)
+        }.should raise_exception(WashOut::Dispatcher::SOAPError)
       end
 
       it "raise to report SOAP errors" do
@@ -728,7 +728,7 @@ describe WashOut do
     it "handles auth callback" do
       mock_controller(
         wsse_auth_callback: lambda {|user, password|
-          return user == "gorilla" && password == "secret" 
+          return user == "gorilla" && password == "secret"
         }
       ) do
         soap_action "checkAuth", :args => :integer, :return => :boolean, :to => 'check_auth'
