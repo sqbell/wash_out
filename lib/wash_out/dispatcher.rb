@@ -114,7 +114,7 @@ module WashOut
     #
     # Rails do not support sequental rescue_from handling, that is, rescuing an
     # exception from a rescue_from handler. Hence this function is a public API.
-    def render_soap_error(message, code=nil, result=nil, status=500)
+    def render_soap_error(message, code=nil, result=nil, status=500, no_empty_tags=false)
       @namespace   = soap_config.namespace
       @operation   = soap_action = request.env['wash_out.soap_action']
       @action_spec = self.class.soap_actions[soap_action]
@@ -122,8 +122,10 @@ module WashOut
       result = { 'value' => result } unless result.is_a? Hash
       result = HashWithIndifferentAccess.new(result)
 
-      locals = { :error_message => message, :error_code => (code || 'Server') }
-      locals.merge!(:detail => result.nil? ? nil : inject.call(result, @action_spec[:error]))
+      detail = inject.call(result, @action_spec[:error])
+      detail = detail.reject { |s| s.value.nil? } if no_empty_tags
+
+      locals = { :error_message => message, :error_code => (code || 'Server'), :detail => detail }
 
       render :template => "wash_with_soap/#{soap_config.wsdl_style}/error", :status => status,
              :layout => false,

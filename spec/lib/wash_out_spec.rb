@@ -539,20 +539,34 @@ describe WashOut do
         lambda { savon(:error) }.should raise_exception(Savon::SOAPFault)
       end
 
-      it "raises error_details" do
-        mock_controller do
-          soap_action "error",
-                      :args => { :need_error => :boolean },
-                      :return => nil,
-                      error: { :error_code => :integer}
-          def error
-            detail = { errorCode: 1 }
-            render_soap_error "a message", 1, { :error_code => 1 }
+      context 'error details' do
+        it "raises error_details" do
+          mock_controller do
+            soap_action "error",
+                        :args => { :need_error => :boolean },
+                        :return => nil,
+                        :error => { :error_code => :integer, :message => :string, :balance => :double }
+            def error
+              render_soap_error "a message", 1, { :error_code => 1 }
+            end
           end
+
+          expect(safe_savon(:error)[:fault][:detail][:error_fault]).to include(:message, :balance, :error_code => "1")
         end
 
-        expect(safe_savon(:error)[:fault][:detail]).to eq(
-          {:error_fault => { :error_code => "1" }})
+        it "does not output the details if empty" do
+          mock_controller do
+            soap_action 'error',
+                        :args => { :need_error => :boolean },
+                        :return => nil,
+                        :error => { :error_code => :integer, :message => :string, :balance => :double }
+            def error
+              render_soap_error "a message", 1, { :error_code => 1 }, 500, true
+            end
+          end
+
+          expect(safe_savon(:error)[:fault][:detail]).not_to include(:message, :balance)
+        end
       end
 
       it "raise when response structure mismatches" do
